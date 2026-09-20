@@ -1,7 +1,11 @@
 {
   "name": "KoePilot - AI Interview Teleprompter",
   "description": "Real-time AI Interview Co-Pilot & Teleprompter for Indonesian candidates targeting Japan (Tokutei Ginou/IT) and UK multinational jobs, featuring live audio capture, instant Indonesian translation, Romaji breathing script, and UK phonetic guide.",
-  "requestFramePermissions": ["microphone", "camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
-
