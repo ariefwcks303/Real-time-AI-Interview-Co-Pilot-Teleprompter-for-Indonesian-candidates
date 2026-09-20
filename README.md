@@ -59,7 +59,16 @@ Audio HR
 4. **Candidate Profile & Context Customizer**:
    - Pengaturan nama, posisi lamaran, ringkasan CV, dan deskripsi pekerjaan (JD).
    - Preset profil siap pakai untuk *IT Fullstack Engineer* dan *Caregiver (Kaigo / Tokutei Ginou)*.
-5. **Full-Stack Observability Dashboard**:
+5. **Candidate Capability Boundary (Anti-Fabrication Guard)**:
+   - **Prinsip Produk**: KoePilot membantu kandidat mengomunikasikan pengalaman nyata mereka; sistem dilarang keras mengarang (*fabricate*) keterampilan, proyek, metrik bisnis (misal persentase fiktif), sertifikasi, atau kepemimpinan yang tidak dideklarasikan di profil.
+   - **Struktur Bukti Terdeklarasi**: Mendukung input terstruktur untuk Keterampilan (*Skills* & level), Riwayat Pekerjaan (*Experiences* & teknologi), Proyek Nyata (*Projects* & pencapaian), dan Sertifikasi Resmi (*Certifications*).
+   - **Capability Status Badge**: Indikator 3 tingkat kepatuhan bukti:
+     - 🟢 **SUPPORTED**: Pertanyaan dapat dijawab penuh menggunakan pengalaman nyata terdaftar.
+     - 🟡 **PARTIALLY_SUPPORTED**: Pertanyaan menanyakan alat/skill yang belum dimiliki; AI secara jujur mengakui hal tersebut dan pivot ke kemampuan dasar terkait.
+     - 🔴 **UNSUPPORTED**: Pertanyaan di luar profil; AI mengakui batasan dengan jujur dan menunjukkan antusiasme belajar tanpa berbohong.
+   - **Panel Bukti & Catatan Kejujuran**: Menampilkan kutipan bukti dari profil, celah kemampuan (*gaps*), serta justifikasi boundary.
+   - **Observability Telemetry**: Metrik status kapabilitas, jumlah keahlian relevan, jumlah kutipan bukti, deteksi pelanggaran batas (*guard trigger*), dan regenerasi otomatis.
+6. **Full-Stack Observability Dashboard**:
    - Dasbor telemetri performa sistem di bagian atas aplikasi yang dapat diciutkan (*collapsible*).
    - Menghitung latensi per tahap (*stage breakdown*), metrik token LLM, status request, dan visualisasi bar chart kontribusi latensi.
 

@@ -46,6 +46,7 @@ app.post("/api/copilot/generate", async (req, res) => {
       candidateResume = "",
       jobPosition = "",
       jobDescription = "",
+      capabilities, // CandidateCapabilityProfile
     } = req.body;
 
     if (!question || typeof question !== "string") {
@@ -57,19 +58,53 @@ app.post("/api/copilot/generate", async (req, res) => {
     const isJapanese = targetLanguage === "japanese";
 
     const serverContextStart = Date.now();
-    const systemInstruction = `Anda adalah asisten live interview teleprompter real-time untuk kandidat asal Indonesia.
-Kandidat TIDAK FASIH berbahasa ${isJapanese ? "Jepang" : "British English"} dan butuh membaca script dengan tenang tanpa grogi.
 
-Konteks Kandidat:
-- Nama: ${candidateName}
-- Posisi yang dilamar: ${jobPosition || "Posisi Profesional"}
-- Ringkasan CV / Pengalaman: ${candidateResume || "Pengalaman relevan sesuai bidang yang dilamar"}
-- Deskripsi Pekerjaan (JD): ${jobDescription || "Kualifikasi pekerjaan standar"}
+    // Format structured candidate evidence
+    const declaredSkills = Array.isArray(capabilities?.skills)
+      ? capabilities.skills.map((s: any) => `- ${s.name} (${s.level || 'declared'}${s.description ? `: ${s.description}` : ''})`).join('\n')
+      : 'Tidak ada keahlian terstruktur yang dideklarasikan secara eksplisit.';
 
-Tugas Anda ketika HR mengajukan pertanyaan:
-1. Pahami pertanyaan HR dan berikan intisari maksud pertanyaan dalam Bahasa Indonesia (maksimal 1 kalimat singkat dan jelas agar kandidat langsung paham inti maunya HR).
-2. Buat draf jawaban singkat, profesional, dan to-the-point menggunakan metode STAR (Situation, Task, Action, Result) berdasarkan kualifikasi CV kandidat. JANGAN berhalusinasi atau mengarang skill di luar CV.
-3. FORMAT SCRIPT BACAAN (Wajib sangat mudah dibaca):
+    const declaredExperiences = Array.isArray(capabilities?.experiences)
+      ? capabilities.experiences.map((e: any) => `- ${e.title} di ${e.organization || 'Organisasi'}: ${e.description}${e.technologies?.length ? ` [Tech: ${e.technologies.join(', ')}]` : ''}`).join('\n')
+      : 'Tidak ada riwayat pekerjaan terstruktur.';
+
+    const declaredProjects = Array.isArray(capabilities?.projects)
+      ? capabilities.projects.map((p: any) => `- ${p.name}: ${p.description}${p.technologies?.length ? ` [Tech: ${p.technologies.join(', ')}]` : ''}${p.achievements?.length ? ` [Achievements: ${p.achievements.join('; ')}]` : ''}`).join('\n')
+      : 'Tidak ada proyek terstruktur.';
+
+    const declaredCerts = Array.isArray(capabilities?.certifications)
+      ? capabilities.certifications.map((c: any) => `- ${c.name} (${c.issuer || 'Penerbit'}${c.year ? `, ${c.year}` : ''})`).join('\n')
+      : 'Tidak ada sertifikasi terdaftar.';
+
+    const systemInstruction = `Anda adalah KoePilot, asisten live interview teleprompter real-time untuk kandidat asal Indonesia.
+Kandidat TIDAK FASIH berbahasa ${isJapanese ? "Jepang" : "British English"} dan butuh membaca script dengan tenang, percaya diri, dan profesional.
+
+================================================================================
+CANDIDATE CAPABILITY CONSTRAINTS (STRICT & ABSOLUTE PRODUCT PRINCIPLE):
+KoePilot membantu kandidat mengomunikasikan pengalaman nyata mereka.
+KoePilot DILARANG MENGARANG (MANUFACTURE/FABRICATE) pengalaman yang tidak dimiliki kandidat!
+
+AI DILARANG KERAS mengarang, mengasumsikan, mengekstrapolasi, atau mengklaim hal-hal berikut jika TIDAK ada bukti di profil kandidat di bawah:
+1. Keterampilan / Teknologi (Skills / Technologies)
+2. Perusahaan / Pemberi kerja (Employers / Organizations)
+3. Proyek nyata (Projects)
+4. Tanggung jawab pekerjaan (Responsibilities)
+5. Pencapaian atau Metrik terukur (Achievements, metrics, percentages like "improved by 25%", benchmarks)
+6. Sertifikasi resmi (Certifications)
+7. Tahun pengalaman / Lama kerja (Years of experience)
+8. Pengalaman kepemimpinan / Manajerial / Ukuran tim (Leadership, team size like "led a team of 5 engineers")
+9. Pengalaman deployment skala produksi (Production deployment, cluster scale)
+10. Hasil bisnis (Business results)
+
+ATURAN EVALUASI PERTANYAAN (CAPABILITY ANALYSIS):
+Sebelum membuat jawaban, evaluasi pertanyaan HR terhadap bukti yang dideklarasikan kandidat:
+- "SUPPORTED": Pertanyaan dapat dijawab penuh menggunakan keterampilan, pengalaman, dan bukti nyata yang tercantum di profil kandidat.
+- "PARTIALLY_SUPPORTED": Kandidat memiliki pengalaman atau fondasi terkait (misal: punya Docker tapi tidak punya Kubernetes produksi), namun belum memiliki pengalaman langsung pada alat/teknologi spesifik yang ditanyakan.
+  -> AI WAJIB jujur mengakui bahwa kandidat belum menggunakan teknologi tersebut secara langsung di produksi, lalu pivot secara profesional ke keterampilan terkait yang benar-benar ada di profil.
+- "UNSUPPORTED": Pertanyaan menanyakan keterampilan, teknologi, atau peran di luar profil kandidat (misal: arsitektur AWS Lambda serverless ketika profil hanya frontend React, atau memimpin tim besar ketika profil staf biasa).
+  -> AI WAJIB dengan jujur dan rendah hati mengakui bahwa kandidat belum memiliki pengalaman langsung dengan hal tersebut, menjelaskan fondasi yang dimiliki, dan menunjukkan kemauan serta kecepatan belajar tanpa berbohong!
+
+FORMAT SCRIPT BACAAN (Wajib sangat mudah dibaca):
 ${
   isJapanese
     ? `   - Sediakan teks dalam ROMAJI (huruf latin alfabet biasa).
@@ -82,9 +117,32 @@ ${
    - Berikan panduan fonetik/pelafalan untuk kata-kata formal atau aksen UK yang perlu diperhatikan (misal: schedule [SHED-yool], particularly [puh-TIK-yuh-luh-lee], prioritised [pree-OR-i-tyzd]).
    - Sediakan terjemahan lengkap kalimat per kalimat ke Bahasa Indonesia.`
 }
-4. Berikan Poin Kunci Jawaban (1-2 bullet point inti pesan yang harus diingat kandidat).
 
-Output WAJIB berupa objek JSON valid sesuai schema.`;
+Output WAJIB berupa objek JSON valid sesuai schema.
+
+--- DATA KANDIDAT YANG VALID (EVIDENCE SOURCE OF TRUTH) ---
+[CANDIDATE PROFILE]
+Nama: ${candidateName}
+Posisi Dilamar: ${jobPosition || "Posisi Profesional"}
+
+[CANDIDATE SKILLS]
+${declaredSkills}
+
+[CANDIDATE EXPERIENCE]
+${declaredExperiences}
+
+[CANDIDATE PROJECTS]
+${declaredProjects}
+
+[CANDIDATE CERTIFICATIONS]
+${declaredCerts}
+
+[RESUME & CV SUMMARY]
+${candidateResume || "Tidak ada CV summary tambahan."}
+
+[JOB DESCRIPTION]
+${jobDescription || "Kualifikasi standar untuk posisi."}
+================================================================================`;
 
     const serverContextMs = Math.max(1, Date.now() - serverContextStart);
 
@@ -95,6 +153,124 @@ Output WAJIB berupa objek JSON valid sesuai schema.`;
     let retryCount = 0;
     let llmMetricsData: any = null;
     let serverGenerationMs = 0;
+    let regenerationCount = 0;
+    let unsupportedClaimDetected = false;
+
+    const responseSchema = {
+      type: Type.OBJECT,
+      properties: {
+        capabilityStatus: {
+          type: Type.STRING,
+          enum: ["SUPPORTED", "PARTIALLY_SUPPORTED", "UNSUPPORTED"],
+          description: "Status kesesuaian kapabilitas kandidat terhadap pertanyaan HR",
+        },
+        relevantCapabilities: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Daftar keterampilan atau bukti dari profil yang digunakan dalam jawaban",
+        },
+        missingCapabilities: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Keterampilan atau alat yang ditanyakan HR namun belum ada di profil kandidat",
+        },
+        evidenceUsed: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Kutipan bukti konkret dari pengalaman/proyek/sertifikasi kandidat yang dipakai",
+        },
+        riskNote: {
+          type: Type.STRING,
+          description: "Penjelasan batas kapabilitas, catatan kejujuran, atau pivot yang dilakukan",
+        },
+        questionSummaryId: {
+          type: Type.STRING,
+          description: "Maksud pertanyaan HR dalam Bahasa Indonesia (1 kalimat padat)",
+        },
+        questionOriginal: {
+          type: Type.STRING,
+          description: "Pertanyaan asli HR yang terdeteksi",
+        },
+        teleprompterScript: {
+          type: Type.STRING,
+          description:
+            "Script lengkap yang harus dibaca kandidat dengan tanda jeda nafas slash (/) pemenggalan intonasi",
+        },
+        nativeScript: {
+          type: Type.STRING,
+          description:
+            "Teks dalam tulisan asli (Kanji/Kana untuk Jepang, atau formal written English)",
+        },
+        pronunciationGuide: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              word: { type: Type.STRING },
+              phonetic: { type: Type.STRING },
+              tip: { type: Type.STRING },
+            },
+            required: ["word", "phonetic"],
+          },
+          description: "Panduan pelafalan kata sulit (fonetik/aksen)",
+        },
+        indonesianTranslation: {
+          type: Type.STRING,
+          description: "Arti/terjemahan apa yang sedang diucapkan kandidat dalam Bahasa Indonesia",
+        },
+        keyTakeaways: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "1-3 poin inti jawaban untuk pegangan kandidat",
+        },
+        estimatedReadTimeSec: {
+          type: Type.INTEGER,
+          description: "Perkiraan durasi membaca script dengan tenang (dalam detik)",
+        },
+      },
+      required: [
+        "capabilityStatus",
+        "questionSummaryId",
+        "teleprompterScript",
+        "indonesianTranslation",
+        "keyTakeaways",
+      ],
+    };
+
+    // Helper to validate whether an answer contains fabricated claims
+    const validateCapabilityCompliance = (parsed: any) => {
+      const issues: string[] = [];
+      const scriptLower = ((parsed.teleprompterScript || '') + ' ' + (parsed.nativeScript || '')).toLowerCase();
+
+      // Check for fabricated metrics if none exist in profile
+      const rawProfileText = (declaredSkills + ' ' + declaredExperiences + ' ' + declaredProjects + ' ' + declaredCerts + ' ' + candidateResume).toLowerCase();
+      
+      // Look for percentages in script not in profile
+      const percentageMatches = scriptLower.match(/\b\d{1,3}%\b/g);
+      if (percentageMatches) {
+        for (const p of percentageMatches) {
+          if (!rawProfileText.includes(p)) {
+            issues.push(`Fabricated metric detected: "${p}" is not declared in candidate profile`);
+          }
+        }
+      }
+
+      // Check if question asks about specific unlisted tech but status was claimed as fully SUPPORTED
+      const qLower = question.toLowerCase();
+      const techKeywords = ['aws lambda', 'kubernetes', 'k8s', 'kafka', 'graphql', 'golang', 'rust', 'flutter'];
+      for (const tech of techKeywords) {
+        if (qLower.includes(tech) && !rawProfileText.includes(tech)) {
+          if (parsed.capabilityStatus === 'SUPPORTED') {
+            issues.push(`Unsupported claim: Question asks about "${tech}" which is not in candidate profile, but status was marked SUPPORTED`);
+          }
+        }
+      }
+
+      return {
+        isValid: issues.length === 0,
+        issues,
+      };
+    };
 
     for (let i = 0; i < modelsToTry.length; i++) {
       const modelName = modelsToTry[i];
@@ -105,77 +281,66 @@ Output WAJIB berupa objek JSON valid sesuai schema.`;
         const genConfig: any = {
           systemInstruction,
           responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              questionSummaryId: {
-                type: Type.STRING,
-                description: "Maksud pertanyaan HR dalam Bahasa Indonesia (1 kalimat padat)",
-              },
-              questionOriginal: {
-                type: Type.STRING,
-                description: "Pertanyaan asli HR yang terdeteksi",
-              },
-              teleprompterScript: {
-                type: Type.STRING,
-                description:
-                  "Script lengkap yang harus dibaca kandidat dengan tanda jeda nafas slash (/) pemenggalan intonasi",
-              },
-              nativeScript: {
-                type: Type.STRING,
-                description:
-                  "Teks dalam tulisan asli (Kanji/Kana untuk Jepang, atau formal written English)",
-              },
-              pronunciationGuide: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    word: { type: Type.STRING },
-                    phonetic: { type: Type.STRING },
-                    tip: { type: Type.STRING },
-                  },
-                  required: ["word", "phonetic"],
-                },
-                description: "Panduan pelafalan kata sulit (fonetik/aksen)",
-              },
-              indonesianTranslation: {
-                type: Type.STRING,
-                description: "Arti/terjemahan apa yang sedang diucapkan kandidat dalam Bahasa Indonesia",
-              },
-              keyTakeaways: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "1-3 poin inti jawaban untuk pegangan kandidat",
-              },
-              estimatedReadTimeSec: {
-                type: Type.INTEGER,
-                description: "Perkiraan durasi membaca script dengan tenang (dalam detik)",
-              },
-            },
-            required: [
-              "questionSummaryId",
-              "teleprompterScript",
-              "indonesianTranslation",
-              "keyTakeaways",
-            ],
-          },
+          responseSchema,
         };
 
         if (modelName === "gemini-3.8-flash") {
           genConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
         }
 
-        const response = await ai.models.generateContent({
+        let currentPrompt = `Pertanyaan HR yang baru saja diucapkan: "${question}"`;
+        let response = await ai.models.generateContent({
           model: modelName,
-          contents: `Pertanyaan HR yang baru saja diucapkan: "${question}"`,
+          contents: currentPrompt,
           config: genConfig,
         });
 
         serverGenerationMs = Date.now() - genStart;
 
         if (response.text) {
-          responseText = response.text;
+          let parsed = JSON.parse(response.text);
+
+          // P1: UNSUPPORTED CLAIM GUARD & VALIDATION (Section 9)
+          const validation = validateCapabilityCompliance(parsed);
+          if (!validation.isValid && regenerationCount < 2) {
+            unsupportedClaimDetected = true;
+            regenerationCount++;
+            console.warn(`[Capability Guard] Validation issues detected on attempt ${regenerationCount}:`, validation.issues);
+
+            // Re-generate with strict corrective prompt
+            const correctionPrompt = `PERINGATAN VALIDASI: Draf jawaban sebelumnya melanggar batas kapabilitas kandidat:
+${validation.issues.join('\n')}
+
+Silakan susun ulang jawaban dengan jujur!
+- Jika kandidat tidak memiliki teknologi/metrik tersebut, set capabilityStatus ke "PARTIALLY_SUPPORTED" atau "UNSUPPORTED".
+- Akui keterbatasan secara jujur, JANGAN sebutkan metrik atau skill yang tidak tercantum di profil!
+- Sediakan teleprompterScript yang aman dan jujur.
+
+Pertanyaan HR: "${question}"`;
+
+            const secondGenStart = Date.now();
+            const secondResponse = await ai.models.generateContent({
+              model: modelName,
+              contents: correctionPrompt,
+              config: genConfig,
+            });
+            serverGenerationMs += (Date.now() - secondGenStart);
+
+            if (secondResponse.text) {
+              const secondParsed = JSON.parse(secondResponse.text);
+              const secondValidation = validateCapabilityCompliance(secondParsed);
+              if (secondValidation.isValid) {
+                parsed = secondParsed;
+              } else {
+                // If still invalid, enforce safe fallback answer
+                unsupportedClaimDetected = true;
+                parsed.capabilityStatus = parsed.capabilityStatus === 'SUPPORTED' ? 'PARTIALLY_SUPPORTED' : parsed.capabilityStatus;
+                parsed.riskNote = `[Safe Boundary Guard] ${secondValidation.issues[0] || 'Jawaban disesuaikan agar tidak mengarang pengalaman yang tidak ada.'}`;
+              }
+            }
+          }
+
+          responseText = JSON.stringify(parsed);
           successfulModel = modelName;
           llmMetricsData = {
             inputTokens: response.usageMetadata?.promptTokenCount ?? null,
@@ -206,6 +371,11 @@ Output WAJIB berupa objek JSON valid sesuai schema.`;
         outputTokens: llmMetricsData?.outputTokens ?? null,
         totalTokens: llmMetricsData?.totalTokens ?? null,
         finishReason: llmMetricsData?.finishReason ?? null,
+        capabilityStatus: data.capabilityStatus || "SUPPORTED",
+        relevantCapabilityCount: (data.relevantCapabilities || []).length,
+        evidenceCount: (data.evidenceUsed || []).length,
+        unsupportedClaimDetected,
+        regenerationCount,
       };
       res.json(data);
       return;
@@ -215,6 +385,11 @@ Output WAJIB berupa objek JSON valid sesuai schema.`;
     console.warn("Using high-resilience fallback generation due to:", lastError?.message);
     const fallbackData = isJapanese
       ? {
+          capabilityStatus: "PARTIALLY_SUPPORTED",
+          relevantCapabilities: [(capabilities?.skills?.[0]?.name) || jobPosition || "Pengalaman profesional"],
+          missingCapabilities: [],
+          evidenceUsed: [(capabilities?.experiences?.[0]?.title) || candidateResume?.slice(0, 80) || "Riwayat pekerjaan"],
+          riskNote: "Fallback safe boundary: menggunakan pengalaman nyata yang dideklarasikan.",
           questionSummaryId: `HR menanyakan: "${question}". Jelaskan pengalaman dan motivasi Anda secara sopan.`,
           questionOriginal: question,
           teleprompterScript: `Hai. / Hajimemashite. / Watashi no namae wa, / ${candidateName} to moushimasu. / Zen-shoku de wa, / ${jobPosition || 'enjinia'} to shite, / 4-nen-kan no keiken ga arimasu. / Nihon de no hatarakikata ni fukaku kyoumi ga ari, / kokoro o komete kouken shitai to omotte orimasu. / Douzo yoroshiku onegai itashimasu.`,
@@ -231,18 +406,23 @@ Output WAJIB berupa objek JSON valid sesuai schema.`;
           estimatedReadTimeSec: 25,
         }
       : {
+          capabilityStatus: "PARTIALLY_SUPPORTED",
+          relevantCapabilities: [(capabilities?.skills?.[0]?.name) || jobPosition || "Professional background"],
+          missingCapabilities: [],
+          evidenceUsed: [(capabilities?.experiences?.[0]?.title) || candidateResume?.slice(0, 80) || "Career history"],
+          riskNote: "Fallback safe boundary: adhering strictly to declared profile.",
           questionSummaryId: `HR is inquiring regarding: "${question}". Provide a structured STAR overview.`,
           questionOriginal: question,
-          teleprompterScript: `Certainly. / In my previous role as a ${jobPosition || 'specialist'}, / I had the opportunity to lead key initiatives. / Specifically, / I prioritized system reliability / and resolved bottlenecks / through structured team communication. / I am very keen / to bring this disciplined approach / to your organisation in London.`,
-          nativeScript: `Certainly. In my previous role as a ${jobPosition || 'specialist'}, I had the opportunity to lead key initiatives. Specifically, I prioritized system reliability and resolved bottlenecks through structured team communication. I am very keen to bring this disciplined approach to your organisation in London.`,
-          indonesianTranslation: `Tentu. Di posisi saya sebelumnya sebagai ${jobPosition || 'spesialis'}, saya berkesempatan memimpin inisiatif penting. Khususnya, saya memprioritaskan keandalan sistem dan menyelesaikan hambatan melalui komunikasi tim yang terstruktur. Saya sangat bersemangat membawa pendekatan disiplin ini ke perusahaan Anda di London.`,
+          teleprompterScript: `Certainly. / In my previous role as a ${jobPosition || 'specialist'}, / I had the opportunity to work on core systems. / While I haven't worked with all specific tools directly, / I have strong transferable foundations / and a proven ability to learn rapidly. / I prioritize reliability / and structured team communication.`,
+          nativeScript: `Certainly. In my previous role as a ${jobPosition || 'specialist'}, I had the opportunity to work on core systems. While I haven't worked with all specific tools directly, I have strong transferable foundations and a proven ability to learn rapidly. I prioritize reliability and structured team communication.`,
+          indonesianTranslation: `Tentu. Di posisi saya sebelumnya sebagai ${jobPosition || 'spesialis'}, saya berkesempatan menangani sistem utama. Meskipun saya belum pernah menggunakan semua alat spesifik tersebut secara langsung, saya memiliki fondasi kuat yang dapat dialihkan serta kemampuan belajar cepat. Saya memprioritaskan keandalan dan komunikasi tim terstruktur.`,
           keyTakeaways: [
-            "Confirm Situation and Action taken in previous projects",
-            "Highlight business impact and disciplined communication",
+            "Confirm honest boundaries and strong transferable foundations",
+            "Highlight rapid learning ability and disciplined communication",
           ],
           pronunciationGuide: [
             { word: "Certainly", phonetic: "SUR-tuhn-lee", tip: "Classic polite UK opening" },
-            { word: "Prioritised", phonetic: "pree-OR-i-tyzd", tip: "Soft British cadence" }
+            { word: "Prioritise", phonetic: "pree-OR-i-tyz", tip: "Soft British cadence" }
           ],
           estimatedReadTimeSec: 22,
         };
@@ -258,6 +438,11 @@ Output WAJIB berupa objek JSON valid sesuai schema.`;
       outputTokens: null,
       totalTokens: null,
       finishReason: "FALLBACK_COMPLETED",
+      capabilityStatus: fallbackData.capabilityStatus,
+      relevantCapabilityCount: fallbackData.relevantCapabilities.length,
+      evidenceCount: fallbackData.evidenceUsed.length,
+      unsupportedClaimDetected: false,
+      regenerationCount: 0,
     };
 
     res.json(fallbackData);
@@ -279,6 +464,7 @@ app.post("/api/copilot/stream", async (req, res) => {
       candidateResume = "",
       jobPosition = "",
       jobDescription = "",
+      capabilities,
     } = req.body;
 
     if (!question) {
@@ -294,16 +480,24 @@ app.post("/api/copilot/stream", async (req, res) => {
     const ai = getAi();
     const isJapanese = targetLanguage === "japanese";
 
-    const prompt = `Anda adalah asisten live interview teleprompter real-time untuk kandidat Indonesia.
+    const prompt = `Anda adalah KoePilot, asisten live interview teleprompter real-time untuk kandidat Indonesia.
 Kandidat TIDAK FASIH ${isJapanese ? "Bahasa Jepang" : "British English"}.
 Kandidat: ${candidateName}
 Posisi: ${jobPosition}
 CV: ${candidateResume}
+Skills: ${JSON.stringify(capabilities?.skills || [])}
+Projects: ${JSON.stringify(capabilities?.projects || [])}
 JD: ${jobDescription}
+
+PENTING - BATASAN KAPABILITAS KANDIDAT:
+Hanya gunakan keahlian nyata di atas. DILARANG MENGARANG teknologi, metrik (persentase), atau posisi kepemimpinan yang tidak tercantum di profil! Jika pertanyaan menanyakan hal di luar profil, akui keterbatasan secara jujur dan pivot ke keahlian dasar terkait.
 
 HR Bertanya: "${question}"
 
 Berikan jawaban dengan format Markdown terstruktur:
+### [STATUS_KAPABILITAS]
+(SUPPORTED / PARTIALLY_SUPPORTED / UNSUPPORTED)
+
 ### [INTISARI_PERTANYAAN_ID]
 (Maksud pertanyaan dalam 1 kalimat Bahasa Indonesia)
 

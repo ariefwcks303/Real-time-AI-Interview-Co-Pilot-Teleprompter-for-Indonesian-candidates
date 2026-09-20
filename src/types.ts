@@ -8,6 +8,50 @@ export interface PronunciationGuideItem {
   tip?: string;
 }
 
+export type CapabilityStatus = 'SUPPORTED' | 'PARTIALLY_SUPPORTED' | 'UNSUPPORTED';
+
+export interface CandidateSkill {
+  name: string;
+  level?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  description?: string;
+}
+
+export interface CandidateExperience {
+  title: string;
+  organization?: string;
+  description: string;
+  technologies?: string[];
+}
+
+export interface CandidateProject {
+  name: string;
+  description: string;
+  technologies?: string[];
+  responsibilities?: string[];
+  achievements?: string[];
+}
+
+export interface CandidateCertification {
+  name: string;
+  issuer?: string;
+  year?: string;
+}
+
+export interface CandidateCapabilityProfile {
+  skills: CandidateSkill[];
+  experiences: CandidateExperience[];
+  projects: CandidateProject[];
+  certifications: CandidateCertification[];
+}
+
+export interface CapabilityAnalysis {
+  capabilityStatus: CapabilityStatus;
+  relevantCapabilities: string[];
+  missingCapabilities: string[];
+  evidenceUsed: string[];
+  riskNote: string | null;
+}
+
 export interface CopilotResponse {
   questionSummaryId: string;
   questionOriginal: string;
@@ -18,6 +62,12 @@ export interface CopilotResponse {
   keyTakeaways: string[];
   estimatedReadTimeSec?: number;
   timestamp?: number;
+  // Capability Boundary Metadata
+  capabilityStatus?: CapabilityStatus;
+  relevantCapabilities?: string[];
+  missingCapabilities?: string[];
+  evidenceUsed?: string[];
+  riskNote?: string | null;
 }
 
 export interface CandidateProfile {
@@ -29,6 +79,7 @@ export interface CandidateProfile {
   resumeSummary: string;
   jobDescription: string;
   badge: string;
+  capabilities?: CandidateCapabilityProfile;
 }
 
 export interface MockQuestion {
@@ -74,6 +125,13 @@ export interface ObservabilityRecord {
     inputCharacters: number | null;
     outputCharacters: number | null;
     modelName: string | null;
+  };
+  capabilityMetrics?: {
+    capabilityStatus: CapabilityStatus | null;
+    relevantCapabilityCount: number;
+    evidenceCount: number;
+    unsupportedClaimDetected: boolean;
+    regenerationCount: number;
   };
   llmMetrics: {
     timeToFirstTokenMs: number | null;

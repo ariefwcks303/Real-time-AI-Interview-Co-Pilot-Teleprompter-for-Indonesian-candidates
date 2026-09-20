@@ -17,7 +17,10 @@ import {
   Copy,
   Check,
   Eye,
-  Radio
+  Radio,
+  ShieldCheck,
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { CopilotResponse, CopilotStatus, TargetLanguage } from '../types';
 
@@ -44,6 +47,7 @@ export const TeleprompterView: React.FC<TeleprompterViewProps> = ({
   const [showNativeScript, setShowNativeScript] = useState<boolean>(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [showEvidencePanel, setShowEvidencePanel] = useState<boolean>(true);
   const scriptContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll loop
@@ -275,6 +279,122 @@ export const TeleprompterView: React.FC<TeleprompterViewProps> = ({
                 </p>
               </div>
             </div>
+
+            {/* CANDIDATE CAPABILITY BOUNDARY & EVIDENCE PANEL */}
+            {currentResponse.capabilityStatus && (
+              <div className={`p-4 rounded-xl border transition-all ${
+                currentResponse.capabilityStatus === 'SUPPORTED'
+                  ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                  : currentResponse.capabilityStatus === 'PARTIALLY_SUPPORTED'
+                  ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                  : 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+              }`}>
+                {/* Header Strip */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className={`w-4 h-4 ${
+                      currentResponse.capabilityStatus === 'SUPPORTED' ? 'text-emerald-400' :
+                      currentResponse.capabilityStatus === 'PARTIALLY_SUPPORTED' ? 'text-amber-400' :
+                      'text-rose-400'
+                    }`} />
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Capability Boundary:
+                    </span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                      currentResponse.capabilityStatus === 'SUPPORTED'
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                        : currentResponse.capabilityStatus === 'PARTIALLY_SUPPORTED'
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                    }`}>
+                      {currentResponse.capabilityStatus === 'SUPPORTED' && '🟢 SUPPORTED (Didukung Bukti)'}
+                      {currentResponse.capabilityStatus === 'PARTIALLY_SUPPORTED' && '🟡 PARTIALLY SUPPORTED (Pivot Jujur)'}
+                      {currentResponse.capabilityStatus === 'UNSUPPORTED' && '🔴 UNSUPPORTED (Keterbatasan Jujur)'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowEvidencePanel(!showEvidencePanel)}
+                    className="text-xs text-neutral-300 hover:text-white flex items-center gap-1 bg-neutral-900/60 px-2.5 py-1 rounded-lg border border-neutral-800 transition"
+                  >
+                    <span>{showEvidencePanel ? 'Tutup Detail Bukti' : 'Lihat Detail Bukti'}</span>
+                    {showEvidencePanel ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                {/* Subtitle / Status Explanation */}
+                <p className="text-xs text-neutral-300 mt-1.5 leading-relaxed">
+                  {currentResponse.capabilityStatus === 'SUPPORTED' &&
+                    'KoePilot memastikan jawaban sepenuhnya bertumpu pada keahlian, teknologi, dan riwayat yang Anda deklarasikan tanpa karangan metrik.'}
+                  {currentResponse.capabilityStatus === 'PARTIALLY_SUPPORTED' &&
+                    'Pertanyaan menyinggung teknologi/alat yang belum terdaftar di profil. AI secara jujur mengakui hal tersebut dan pivot ke kemampuan dasar yang Anda miliki.'}
+                  {currentResponse.capabilityStatus === 'UNSUPPORTED' &&
+                    'Keahlian yang ditanyakan di luar profil Anda. AI menyusun jawaban yang jujur mengakui batasan dengan sikap antusias mempelajari hal baru.'}
+                </p>
+
+                {/* Expandable Details Area */}
+                {showEvidencePanel && (
+                  <div className="mt-3 pt-3 border-t border-neutral-800/80 space-y-2.5 text-xs">
+                    {/* Relevant Capabilities */}
+                    {currentResponse.relevantCapabilities && currentResponse.relevantCapabilities.length > 0 && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-neutral-400 block mb-1">
+                          🎯 Keahlian Terdaftar yang Digunakan (Declared Capabilities):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {currentResponse.relevantCapabilities.map((cap, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-200 text-[11px] font-medium">
+                              ✓ {cap}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Missing Capabilities / Identified Gaps */}
+                    {currentResponse.missingCapabilities && currentResponse.missingCapabilities.length > 0 && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-amber-400/90 block mb-1">
+                          ⚠️ Keahlian yang Belum Ada di Profil (Safely Acknowledged):
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {currentResponse.missingCapabilities.map((gap, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded bg-amber-950/30 border border-amber-500/30 text-amber-300 text-[11px]">
+                              × {gap}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Evidence Citations */}
+                    {currentResponse.evidenceUsed && currentResponse.evidenceUsed.length > 0 && (
+                      <div>
+                        <span className="text-[11px] font-semibold text-neutral-400 block mb-1">
+                          📑 Kutipan Bukti Nyata dari Profil (Evidence Citations):
+                        </span>
+                        <ul className="space-y-1 text-neutral-300 list-disc list-inside text-[11px]">
+                          {currentResponse.evidenceUsed.map((ev, i) => (
+                            <li key={i} className="font-mono text-neutral-300">{ev}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Risk & Safety Note */}
+                    {currentResponse.riskNote && (
+                      <div className="p-2.5 rounded-lg bg-neutral-900/80 border border-neutral-800 flex items-start gap-2">
+                        <Info className="w-3.5 h-3.5 text-neutral-400 shrink-0 mt-0.5" />
+                        <span className="text-[11px] text-neutral-300 leading-snug">
+                          <strong className="text-white font-medium">Catatan Kejujuran:</strong> {currentResponse.riskNote}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Main Teleprompter Script Area */}
             <div className="relative p-6 rounded-2xl bg-neutral-950 border border-rose-500/30 shadow-inner">

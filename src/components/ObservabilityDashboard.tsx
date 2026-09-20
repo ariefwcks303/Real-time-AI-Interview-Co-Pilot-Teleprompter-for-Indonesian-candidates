@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Radio,
-  BarChart3
+  BarChart3,
+  ShieldCheck
 } from 'lucide-react';
 import { ObservabilityRecord, PipelineStatus } from '../types';
 
@@ -287,6 +288,33 @@ export const ObservabilityDashboard: React.FC<ObservabilityDashboardProps> = ({
               <span className="text-[10px] text-neutral-500 block truncate">
                 Reason: {active?.llmMetrics.finishReason || 'N/A'}
               </span>
+            </div>
+          </div>
+
+          {/* Candidate Capability Boundary Telemetry Strip */}
+          <div className="p-3 rounded-xl bg-neutral-900/80 border border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span className="font-bold text-neutral-200">Capability Boundary Telemetry:</span>
+              <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
+                active?.capabilityMetrics?.capabilityStatus === 'SUPPORTED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' :
+                active?.capabilityMetrics?.capabilityStatus === 'PARTIALLY_SUPPORTED' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
+                active?.capabilityMetrics?.capabilityStatus === 'UNSUPPORTED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
+                'bg-neutral-800 text-neutral-400'
+              }`}>
+                {active?.capabilityMetrics?.capabilityStatus ? `${active.capabilityMetrics.capabilityStatus}` : 'READY / STANDBY'}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-neutral-300">
+              <span>Relevant Caps: <strong className="text-white">{active?.capabilityMetrics?.relevantCapabilityCount ?? 0}</strong></span>
+              <span className="text-neutral-600">•</span>
+              <span>Evidence Cited: <strong className="text-white">{active?.capabilityMetrics?.evidenceCount ?? 0}</strong></span>
+              <span className="text-neutral-600">•</span>
+              <span>Boundary Guard: <strong className={active?.capabilityMetrics?.unsupportedClaimDetected ? 'text-amber-400' : 'text-emerald-400'}>
+                {active?.capabilityMetrics?.unsupportedClaimDetected ? 'TRIGGERED & CORRECTED' : 'CLEAN (No Fabrication)'}
+              </strong></span>
+              <span className="text-neutral-600">•</span>
+              <span>Regenerations: <strong className="text-white">{active?.capabilityMetrics?.regenerationCount ?? 0}</strong></span>
             </div>
           </div>
 

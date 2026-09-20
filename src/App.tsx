@@ -143,6 +143,7 @@ export default function App() {
           candidateResume: profile.resumeSummary,
           jobPosition: profile.jobPosition,
           jobDescription: profile.jobDescription,
+          capabilities: profile.capabilities,
         }),
       });
 
@@ -175,6 +176,11 @@ export default function App() {
         keyTakeaways: data.keyTakeaways || [],
         estimatedReadTimeSec: data.estimatedReadTimeSec,
         timestamp: Date.now(),
+        capabilityStatus: data.capabilityStatus,
+        relevantCapabilities: data.relevantCapabilities || [],
+        missingCapabilities: data.missingCapabilities || [],
+        evidenceUsed: data.evidenceUsed || [],
+        riskNote: data.riskNote || null,
       };
       const postProcessingMs = Math.max(1, Math.round(performance.now() - postProcessStart));
       console.log(`[${reqId}] POST_PROCESSING: ${postProcessingMs} ms`);
@@ -220,6 +226,13 @@ export default function App() {
             inputCharacters: serverObs.inputCharacters ?? (questionText.length + profile.resumeSummary.length),
             outputCharacters: serverObs.outputCharacters ?? data.teleprompterScript?.length ?? 0,
             modelName: serverObs.modelName ?? 'gemini-3.8-flash',
+          },
+          capabilityMetrics: {
+            capabilityStatus: data.capabilityStatus ?? null,
+            relevantCapabilityCount: (data.relevantCapabilities || []).length,
+            evidenceCount: (data.evidenceUsed || []).length,
+            unsupportedClaimDetected: serverObs.unsupportedClaimDetected ?? false,
+            regenerationCount: serverObs.regenerationCount ?? 0,
           },
           llmMetrics: {
             timeToFirstTokenMs: null, // N/A for non-streaming batch endpoint
